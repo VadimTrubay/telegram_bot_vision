@@ -1,15 +1,38 @@
 import {config} from 'dotenv'
 import TelegramBot from "node-telegram-bot-api";
-import {downloadImageOptions} from "./options.js";
+import OpenAI from "openai";
 
 config()
 
-const token = process.env.TELEGRAM_API_TOKEN
-const bot = new TelegramBot(token, {polling: true});
-
+const tokenTelegram = process.env.TELEGRAM_API_TOKEN
+const tokenOPENAI = process.env.OPENAI_API_KEY
+const bot = new TelegramBot(tokenTelegram, {polling: true});
+const openai = new OpenAI(`Authorization: Bearer ${tokenOPENAI}`);
 let images = {};
 
+const OPENAI = async (url) => {
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "What’s in this image?" },
+          {
+            type: "image_url",
+            image_url: {
+              "url": `${url}`,
+            },
+          },
+        ],
+      },
+    ],
+  });
+  return response.choices[0];
+}
+
 const start = () => {
+
   bot.setMyCommands(
     [
       {
@@ -39,7 +62,17 @@ const start = () => {
       return bot.sendMessage(chatId, `your name: ${name}`)
     }
     if (text === '/download_image') {
-      return 'download'
+      return  bot.sendMessage(chatId, 'Enter to url image for download')
+    }
+    if (text.includes('https://')) {
+      try {
+        images['chatId'] = {url: text};
+        const response = await OPENAI(images['chatId'].url)
+        return bot.sendMessage(chatId, response.message.content)
+      }
+      catch (e) {
+        return bot.sendMessage(chatId, `I don't understand you`)
+      }
     }
     return bot.sendMessage(chatId, `I don't understand you`)
   })
